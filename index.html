@@ -253,7 +253,7 @@ textarea { min-height: 5em; resize: vertical; }
   var ASK = [["energy", "A year of metered energy use"], ["indoor", "Measured indoor climate"], ["logs", "Logs of the controls in operation"],
              ["people", "A survey of the people inside"], ["override", "How often people override it"]];
   var VERDICTS = [["smart", "Smart"], ["part", "Smart in part"], ["auto", "Only automated"], ["open", "We cannot tell yet"]];
-  var STEPS = ["The facts", "The ladder", "The roles", "The evidence", "Your verdict", "Two labels"];
+  var STEPS = ["The facts", "The ladder", "The roles", "The evidence", "Your verdict"];
 
   // The facts are information: what the sources say, and on what basis. Nothing here is a question.
   var CASES = {
@@ -301,21 +301,14 @@ textarea { min-height: 5em; resize: vertical; }
     }
   };
 
-  var LABELS = [
-    { c: "edge", label: "“The smartest building in the world”", note: "A magazine headline about The Edge, 2015.",
-      reading: "It rests on claims and a rating of the design, counts solar power from other roofs, and says nothing on the grid." },
-    { c: "viva", label: "“A failed smart building”", note: "Nobody published this. It is what a quick reader of the battery story might say about Brf Viva.",
-      reading: "It judges the whole building by one function. The storage worked, and the problem is known because it was studied." }
-  ];
-
   // ---------------------------------------------------------------- state
-  var KEY = "bta317-case-critique-v2";
+  var KEY = "bta317-case-critique-v3";
   function fresh() {
     return { c: null, step: 0, seen: [], open: -1,
              lad: { step: "", q: "", facts: [] },
              roles: { eff: { v: "", f: "" }, com: { v: "", f: "" }, flex: { v: "", f: "" }, res: { v: "", f: "" } },
              ev: { best: "", least: "", ask: [] },
-             verdict: { v: "", f: "" }, why: "", labels: ["", ""], reveal: false, confirm: false };
+             verdict: { v: "", f: "" }, why: "", reveal: false, confirm: false };
   }
   var state = fresh();
   try {
@@ -373,7 +366,7 @@ textarea { min-height: 5em; resize: vertical; }
   var views = [
     function start() {
       var h = "<h1>Smart, or only automated?</h1>" +
-        '<p class="lead">Pick the building your group judges. The facts are given. The judgement is yours: take a position, and say which facts carry it.</p>' +
+        '<p class="lead">Pick the building you were given. You work on your own. The facts are given. The judgement is yours: take a position, and say which facts carry it.</p>' +
         '<div class="stack">';
       ["edge", "viva"].forEach(function (k) {
         var c = CASES[k];
@@ -414,10 +407,10 @@ textarea { min-height: 5em; resize: vertical; }
     function ladder(c) {
       var L = state.lad;
       var h = "<h1>Where does it stand on the ladder?</h1>" +
-        '<p class="lead">Judge ' + c.name + " as a whole. Groups will differ. What counts is your reason.</p>" + drawer(c) +
-        '<div class="card"><h2>We place it at</h2>' + opts("ladstep", LADDER, L.step) + "</div>" +
+        '<p class="lead">Judge ' + c.name + " as a whole. People will differ. What counts is your reason.</p>" + drawer(c) +
+        '<div class="card"><h2>I place it at</h2>' + opts("ladstep", LADDER, L.step) + "</div>" +
         '<div class="card"><h2>The question that stops it from going higher</h2>' + opts("ladq", QUESTIONS, L.q, "", true) + "</div>" +
-        '<div class="card"><h2>The facts that carry our answer</h2><p class="hint">Pick one or two.</p><div class="opts">';
+        '<div class="card"><h2>The facts that carry my answer</h2><p class="hint">Pick one or two.</p><div class="opts">';
       c.spots.forEach(function (s, i) {
         h += '<button class="opt" data-a="ladfact" data-i="' + i + '" aria-pressed="' + (L.facts.indexOf(i) >= 0) + '">' + (i + 1) + ". " + s.t + "</button>";
       });
@@ -443,34 +436,23 @@ textarea { min-height: 5em; resize: vertical; }
       var E = state.ev;
       var h = "<h1>How good is the evidence?</h1>" +
         '<p class="lead">Open the facts and read the basis of each one. Then judge what we really know about ' + c.name + ".</p>" + drawer(c, true) +
-        '<div class="card"><h2>The strongest kind of evidence we have</h2>' + opts("evbest", BEST, E.best) + "</div>" +
-        '<div class="card"><h2><label for="least">The fact we trust least</label></h2>' + factSelect(c, "least", "least", E.least, "Choose a fact") + "</div>" +
-        '<div class="card"><h2>Before advising an owner, we would ask for</h2><p class="hint">Pick what matters most.</p>' + opts("evask", ASK, E.ask, "", true) + "</div>";
+        '<div class="card"><h2>The strongest kind of evidence here</h2>' + opts("evbest", BEST, E.best) + "</div>" +
+        '<div class="card"><h2><label for="least">The fact I trust least</label></h2>' + factSelect(c, "least", "least", E.least, "Choose a fact") + "</div>" +
+        '<div class="card"><h2>Before advising an owner, I would ask for</h2><p class="hint">Pick what matters most.</p>' + opts("evask", ASK, E.ask, "", true) + "</div>";
       return h + foot("Next: your verdict", !(E.best && E.least !== "" && E.ask.length));
     },
     function verdict(c) {
       var V = state.verdict;
       var h = "<h1>Your verdict on " + c.name + "</h1>" +
-        '<p class="lead">Smart, or only automated? Agree in your group, and be ready to defend it.</p>' + drawer(c) +
-        '<div class="card"><h2>Our verdict</h2>' + opts("verdict", VERDICTS, V.v, "", true) + "</div>" +
+        '<p class="lead">Smart, or only automated? Decide, and be ready to defend it.</p>' + drawer(c) +
+        '<div class="card"><h2>My verdict</h2>' + opts("verdict", VERDICTS, V.v, "", true) + "</div>" +
         '<div class="card"><h2><label for="weighs">The fact that weighs most</label></h2>' + factSelect(c, "weighs", "weighs", V.f, "Choose a fact") + "</div>" +
-        '<div class="card"><h2><label for="why">Our reason, in one sentence</label></h2><textarea id="why" data-t="why" placeholder="We say this because"></textarea></div>';
-      return h + foot("Next: two labels", !V.v);
-    },
-    function labels(c) {
-      var other = CASES[state.c === "edge" ? "viva" : "edge"];
-      var h = "<h1>Two labels</h1>" +
-        '<p class="lead">Now both buildings. Each label is too simple. Say why, in your own words. The facts about both buildings are below.</p>' +
-        drawer(c) + drawer(other);
-      LABELS.forEach(function (L, i) {
-        h += '<div class="card"><p class="label-quote">' + L.label + '</p><p class="hint">' + L.note + "</p>" +
-          '<label class="hint" for="label-' + i + '">Too simple, because</label><textarea id="label-' + i + '" data-t="label:' + i + '"></textarea></div>';
-      });
-      return h + foot("Finish: your audit", false);
+        '<div class="card"><h2><label for="why">My reason, in one sentence</label></h2><textarea id="why" data-t="why" placeholder="I say this because"></textarea></div>';
+      return h + foot("Finish: your audit", !V.v);
     },
     function audit(c) {
       var L = state.lad, E = state.ev, V = state.verdict;
-      var h = "<h1>Your audit of " + c.name + '</h1><p class="lead">Report from this card when your group is asked.</p>' +
+      var h = "<h1>Your audit of " + c.name + '</h1><p class="lead">Report from this card when you are asked.</p>' +
         '<div class="card audit"><dl>' +
         "<dt>Ladder</dt><dd>" + (name(LADDER, L.step) || "not placed") +
           "<span>Stopped by: " + (name(QUESTIONS, L.q) || "not chosen") + "</span><span>Carried by: " +
@@ -482,25 +464,21 @@ textarea { min-height: 5em; resize: vertical; }
           (R.v === "yes" && R.f !== "" ? " (" + factName(c, R.f) + ")" : "") + "</span>";
       });
       h += "</dd><dt>Evidence</dt><dd>" + (name(BEST, E.best) || "not judged") +
-          "<span>Trusted least: " + (factName(c, E.least) || "not chosen") + "</span><span>We would ask for: " +
+          "<span>Trusted least: " + (factName(c, E.least) || "not chosen") + "</span><span>I would ask for: " +
           (E.ask.map(function (k) { return name(ASK, k).toLowerCase(); }).join("; ") || "nothing chosen") + "</span></dd>" +
         "<dt>Verdict</dt><dd>" + (name(VERDICTS, V.v) || "none yet") +
           (V.f !== "" ? "<span>Weighs most: " + factName(c, V.f) + "</span>" : "") +
           (state.why ? "<span>" + esc(state.why) + "</span>" : "") + "</dd>";
-      LABELS.forEach(function (Lb, i) {
-        h += "<dt>" + (i === 0 ? "Labels" : "") + "</dt><dd>" + Lb.label + "<span>" + (state.labels[i] ? esc(state.labels[i]) : "no reason written") + "</span></dd>";
-      });
       h += "</dl></div>";
       if (state.reveal) {
         var R = c.reading;
         h += '<div class="card audit"><h2>The lecturer\'s reading of ' + c.name + '</h2><p class="hint">One reading, not the answer. Where does yours differ, and who has the better argument?</p><dl>' +
           "<dt>Ladder</dt><dd>" + R.ladder + "</dd><dt>Roles</dt><dd>" + R.roles + "</dd><dt>Evidence</dt><dd>" + R.evidence +
           "</dd><dt>Verdict</dt><dd>" + R.verdict + "</dd>";
-        LABELS.forEach(function (Lb, i) { h += "<dt>" + (i === 0 ? "Labels" : "") + "</dt><dd>" + Lb.label + "<span>" + Lb.reading + "</span></dd>"; });
         h += "</dl></div>";
       } else {
         h += '<button class="go reveal" data-a="reveal">Show the lecturer\'s reading</button>' +
-          '<p class="hint" style="text-align:center">Wait until your group has reported.</p>';
+          '<p class="hint" style="text-align:center">Wait until the reports are over.</p>';
       }
       return h + '<button class="quiet" data-a="back">Back</button>' +
         '<button class="quiet" data-a="restart">' + (state.confirm ? "Tap again to erase your answers" : "Start over") + "</button>";
@@ -511,8 +489,7 @@ textarea { min-height: 5em; resize: vertical; }
   var app = document.getElementById("app");
   function textTarget(key) {
     if (key === "why") { return { get: function () { return state.why; }, set: function (v) { state.why = v; } }; }
-    var i = +key.split(":")[1];
-    return { get: function () { return state.labels[i]; }, set: function (v) { state.labels[i] = v; } };
+    return { get: function () { return ""; }, set: function () {} };
   }
   function render(top) {
     var c = CASES[state.c];
@@ -582,15 +559,16 @@ textarea { min-height: 5em; resize: vertical; }
       state.roles.eff = { v: "yes", f: "2" }; state.roles.com = { v: "maybe", f: "" };
       state.roles.flex = { v: "no", f: "" }; state.roles.res = { v: "no", f: "" };
       state.ev = { best: "designed", least: "3", ask: ["energy", "logs"] };
-      state.verdict = { v: "part", f: "4" }; state.why = "a <b>reason</b> & more"; state.labels = ["one", "two"];
+      state.verdict = { v: "part", f: "4" }; state.why = "a <b>reason</b> & more";
       for (var s = 1; s < views.length; s += 1) { ok(views[s](c).length > 200, k + ": view " + s + " renders"); }
-      var card = views[7](c);
+      var card = views[6](c);
       ok(card.indexOf("&lt;b&gt;reason") > 0 && card.indexOf("<b>reason") < 0, k + ": typed text is escaped");
       ok(card.indexOf("lecturer's reading of") < 0, k + ": reading hidden until asked");
       state.reveal = true;
-      ok(views[7](c).indexOf(c.reading.verdict) > 0, k + ": reading shown on request");
+      ok(views[6](c).indexOf(c.reading.verdict) > 0, k + ": reading shown on request");
       out.push(k + " ok");
     });
+    ok(views.length === 7 && STEPS.length === 5, "five steps and an audit card");
     ok(factName(CASES.edge, "") === "" && factName(CASES.edge, "4") === "5. The grid", "fact names");
     return "SELFTEST OK\n" + out.join("\n");
   }

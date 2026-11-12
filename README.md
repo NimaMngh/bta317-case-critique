@@ -1,6 +1,6 @@
 # BTA317 Case Critique
 
-A phone app for the case critique in the course BTA317 Smart Building and Smart Cities, lecture of 12 November 2026: *What makes a building smart?*
+A phone app for the case critique in the course BTA317 Smart Building and Smart Cities: *What makes a building smart?*
 
 Each student scans a QR code on the slide and judges one real building alone: Brf Viva, a housing cooperative in Gothenburg that is often called smart. The facts are given as information, each with its basis. The judgement is the student's: where the building stands on the ladder from manual to predictive, which of four roles it serves, how good the evidence is, and a verdict with a reason. Nothing is marked right or wrong, and nothing leaves the phone.
 

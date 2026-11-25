@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>BTA317 The Shower Game</title>
+<style>
+/* One narrow column for a phone held in one hand. Same look as the lecture deck:
+   white ground, dark green ink, orange for what matters. */
+:root {
+  --bg: #f4f7f6; --surface: #fff; --ink: #234642; --ink-soft: #5b6d6a; --line: #d5dedc;
+  --accent: #ff8200; --cold: #0072b2; --ok: #008c64; --hot: #c0392b;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.45 system-ui, "Segoe UI", Roboto, Arial, sans-serif; }
+.wrap { max-width: 34rem; margin: 0 auto; padding: 12px max(16px, env(safe-area-inset-right, 0px)) 28px max(16px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 12px; }
+header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+.eyebrow { font-size: .72rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
+h1 { font-size: 1.5rem; line-height: 1.15; margin: 0; }
+p { margin: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.ask { border-left: 4px solid var(--accent); background: #fff0de; padding: 10px 12px; border-radius: 0 8px 8px 0; }
+button { font: inherit; font-weight: 600; min-height: 48px; border-radius: 10px; border: 2px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; padding: 0 16px; }
+button.ghost { background: transparent; color: var(--ink); }
+.row { display: flex; gap: 10px; } .row > * { flex: 1; }
+.top { display: flex; justify-content: space-between; align-items: baseline; }
+.read { font-size: 3rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.feel { font-weight: 600; min-height: 1.4em; }
+canvas { width: 100%; height: 190px; display: block; }
+.ends { display: flex; justify-content: space-between; font-size: .8rem; color: var(--ink-soft); }
+.tapbox { position: relative; }
+.mark { position: absolute; top: 40px; left: calc(20px + 0.56*(100% - 40px)); transform: translateX(-50%); font-size: .75rem; font-weight: 600; color: var(--accent); white-space: nowrap; }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 44px; margin: 0; background: transparent; touch-action: none; }
+input[type=range]::-webkit-slider-runnable-track { height: 14px; border-radius: 7px; background: linear-gradient(90deg, var(--cold), var(--line) 50%, var(--hot)); }
+input[type=range]::-moz-range-track { height: 14px; border-radius: 7px; background: linear-gradient(90deg, var(--cold), var(--line) 50%, var(--hot)); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 40px; height: 40px; margin-top: -13px; border-radius: 50%; background: var(--ink); border: 3px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+input[type=range]::-moz-range-thumb { width: 34px; height: 34px; border-radius: 50%; background: var(--ink); border: 3px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+input[type=range]:disabled::-webkit-slider-thumb { background: var(--ink-soft); }
+input[type=range]:disabled::-moz-range-thumb { background: var(--ink-soft); }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+th { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); }
+.legend { font-size: .8rem; color: var(--ink-soft); }
+.legend b { color: var(--ink); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><span class="eyebrow">BTA317 · 26 November</span><span class="eyebrow">The shower</span></header>
+  <main id="screen" class="wrap" style="padding:0"></main>
+</div>
+<script>
+// The shower: a mixer tap, a pipe with a delay, and hot water that a dishwasher can take away.
+const T_COLD = 10, T_HOT = 60, T_HOT_DW = 48;   // degC: cold water, hot water, hot water while the dishwasher runs
+const LO = 36, HI = 40;                          // degC: the comfortable band around 38
+const DT = 1/30, LAG = 0.5;                      // s: time step, and a short lag of the shower head
+const MARK = 0.56;                               // tap position that gives 38 degC with full hot water (keep in step with .mark in the CSS)
+
+const ROUNDS = [
+  { name: 'Hands off', dur: 30, delay: 2, dw: [12, 30], locked: true,
+    intro: 'You are at home. Yesterday you found the tap position that gives 38 °C and marked it. Today you set the tap to the mark and step in. In this round the tap is locked on purpose, so you only watch the water.',
+    go: 'Open the tap',
+    ask: 'The grey line is the water leaving the tap. The dark line is the water that reaches you. Something happened at 12 seconds. Why did nothing bring the water back?' },
+  { name: 'Hands on', dur: 50, delay: 2, dw: [22, 38],
+    intro: 'You are in a hotel. This tap has no mark, and the water standing in the pipe is cold. Drag the tap and keep the water between 36 and 40 °C for 50 seconds.',
+    go: 'Step in',
+    ask: 'The dishwasher ran again, and this time you were there. Compare the grey line with the dark line. How late is the dark one?' },
+  { name: 'A long pipe', dur: 50, delay: 5, dw: [22, 38],
+    intro: 'Another hotel. Here the pipe between the tap and the shower head is long. The job is the same, 36 to 40 °C for 50 seconds.',
+    go: 'Step in',
+    ask: 'The same shower and the same dishwasher, with a longer pipe. What did the longer pipe do to your curve?' },
+];
+
+function newSim(r) { return { r, n: 0, T: T_COLD, Ts: [], mix: [], ok: 0, hot: T_COLD }; }
+
+// One time step with the tap at position p (0 cold, 1 hot).
+function stepSim(s, p) {
+  const t = s.n*DT, r = s.r;
+  const th = (t >= r.dw[0] && t < r.dw[1]) ? T_HOT_DW : T_HOT;
+  s.mix.push(T_COLD + p*(th - T_COLD));              // the water leaving the tap
+  const k = s.n - Math.round(r.delay/DT);
+  const arriving = k >= 0 ? s.mix[k] : T_COLD;       // the pipe starts full of cold water
+  s.T += DT/LAG*(arriving - s.T);
+  s.Ts.push(s.T);
+  if (s.T >= LO && s.T <= HI) s.ok += DT;
+  if (s.T > s.hot) s.hot = s.T;
+  s.n++;
+}
+
+// Open ShowerGame_app.html?test to run this check.
+function selfCheck() {
+  const s = newSim(ROUNDS[0]);
+  while (s.n*DT < 30) stepSim(s, MARK);
+  const at = t => s.Ts[Math.round(t/DT) - 1];
+  console.assert(at(1.9) < 10.5, 'cold until the water has passed the pipe');
+  console.assert(Math.abs(at(10) - 38) < 0.1, 'the mark gives 38 degC');
+  console.assert(Math.abs(at(30) - 31.28) < 0.1, 'with the dishwasher the mark gives 31.3 degC');
+  return [at(1.9), at(10), at(30)].map(v => +v.toFixed(2));
+}
+
+const $ = id => document.getElementById(id);
+const screen = $('screen');
+const last = [null, null, null];   // the last finished run of each round
+let raf = 0;
+
+function draw(cv, s, final) {
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight, r = s.r;
+  if (cv.width !== Math.round(W*dpr)) { cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr); }
+  const g = cv.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, W, H);
+  const L = 28, R = 6, T0 = 6, B = 18;
+  const x = t => L + t/r.dur*(W - L - R), y = T => T0 + (65 - T)/60*(H - T0 - B);
+  g.font = '11px system-ui, sans-serif';
+  if (final) {                                        // the dishwasher is shown only afterwards
+    g.fillStyle = '#e3eef6';
+    g.fillRect(x(r.dw[0]), T0, x(r.dw[1]) - x(r.dw[0]), H - T0 - B);
+    g.fillStyle = '#0072b2'; g.textAlign = 'left';
+    g.fillText('dishwasher on', x(r.dw[0]) + 4, T0 + 12);
+  }
+  g.fillStyle = 'rgba(0,140,100,.18)';
+  g.fillRect(L, y(HI), W - L - R, y(LO) - y(HI));
+  g.strokeStyle = '#d5dedc'; g.lineWidth = 1; g.fillStyle = '#5b6d6a';
+  for (let T = 10; T <= 60; T += 10) {
+    g.beginPath(); g.moveTo(L, y(T)); g.lineTo(W - R, y(T)); g.stroke();
+    g.textAlign = 'right'; g.fillText(T, L - 4, y(T) + 4);
+  }
+  g.textAlign = 'center';
+  for (let t = 0; t <= r.dur; t += 10) g.fillText(t + ' s', Math.min(x(t), W - 12), H - 4);
+  const line = (a, colour, width, dash) => {
+    g.beginPath(); g.setLineDash(dash); g.strokeStyle = colour; g.lineWidth = width;
+    a.forEach((v, i) => i ? g.lineTo(x((i + 1)*DT), y(v)) : g.moveTo(x(DT), y(v)));
+    g.stroke(); g.setLineDash([]);
+  };
+  if (final) line(s.mix, '#8a9896', 1.5, [5, 4]);
+  line(s.Ts, '#234642', 2.5, []);
+}
+
+function home() {
+  screen.innerHTML = `<h1>Hold the shower at 38 °C</h1>
+    <p>Three short rounds, each on your own phone. You want the water between 36 and 40 °C for as long as you can.</p>
+    <button id="go">Start round 1</button>`;
+  $('go').onclick = () => intro(0);
+}
+
+function intro(i) {
+  const r = ROUNDS[i];
+  screen.innerHTML = `<span class="eyebrow">Round ${i + 1} of 3</span><h1>${r.name}</h1>
+    <p>${r.intro}</p><button id="go">${r.go}</button>`;
+  $('go').onclick = () => play(i);
+}
+
+function play(i) {
+  const r = ROUNDS[i], s = newSim(r);
+  screen.innerHTML = `<div class="card">
+      <div class="top"><span class="eyebrow">Round ${i + 1} · ${r.name}</span><span class="eyebrow" id="clock"></span></div>
+      <div class="read" id="read"></div><div class="feel" id="feel"></div>
+      <canvas id="cv"></canvas>
+      <label class="eyebrow" for="tap">The tap${r.locked ? ' is locked at your mark' : ''}</label>
+      <div class="tapbox"><input id="tap" type="range" min="0" max="1000" value="${r.locked ? MARK*1000 : 0}" ${r.locked ? 'disabled' : ''}>
+        ${r.locked ? '<span class="mark">▲ your mark</span>' : ''}</div>
+      <div class="ends"><span>cold</span><span>hot</span></div>
+      ${r.locked ? '<p class="ask">🔒 The tap is not broken. It is locked on purpose in this round, and you only watch. In the next round you get it back.</p>' : ''}
+    </div>`;
+  const tap = $('tap'), cv = $('cv'), read = $('read'), feel = $('feel'), clock = $('clock');
+  let before = performance.now(), acc = 0;
+  const frame = now => {
+    acc += Math.min((now - before)/1000, 0.25); before = now;   // a hidden tab does not fast forward
+    while (acc >= DT && s.n*DT < r.dur) { stepSim(s, tap.value/1000); acc -= DT; }
+    const state = s.T < LO ? ['too cold', 'var(--cold)'] : s.T > HI ? ['too hot', 'var(--hot)'] : ['comfortable', 'var(--ok)'];
+    read.textContent = s.T.toFixed(1) + ' °C';
+    read.style.color = feel.style.color = state[1];
+    feel.textContent = state[0];
+    clock.textContent = Math.ceil(r.dur - s.n*DT) + ' s left';
+    draw(cv, s, false);
+    if (s.n*DT < r.dur) raf = requestAnimationFrame(frame); else { last[i] = s; result(i); }
+  };
+  cancelAnimationFrame(raf);
+  raf = requestAnimationFrame(frame);
+}
+
+function result(i) {
+  const r = ROUNDS[i], s = last[i];
+  screen.innerHTML = `<span class="eyebrow">Round ${i + 1} · ${r.name}</span>
+    <h1>Comfortable for ${s.ok.toFixed(0)} of ${r.dur} seconds</h1>
+    <div class="card"><canvas id="cv"></canvas>
+      <p class="legend"><b>Dark</b> the water that reaches you. <b>Grey</b> the water leaving the tap. <b>Green</b> 36 to 40 °C. Hottest ${s.hot.toFixed(1)} °C.</p></div>
+    <p class="ask">${r.ask}</p>
+    <div class="row"><button class="ghost" id="again">Again</button><button id="next">${i < 2 ? 'Next round' : 'My three numbers'}</button></div>`;
+  draw($('cv'), s, true);
+  $('again').onclick = () => intro(i);
+  $('next').onclick = () => i < 2 ? intro(i + 1) : summary();
+}
+
+function summary() {
+  screen.innerHTML = `<h1>Your three numbers</h1>
+    <div class="card"><table><tr><th>Round</th><th>Comfortable</th><th>Hottest</th></tr>
+      ${ROUNDS.map((r, i) => `<tr><td>${i + 1} ${r.name}</td><td>${last[i].ok.toFixed(0)} of ${r.dur} s</td><td>${last[i].hot.toFixed(1)} °C</td></tr>`).join('')}
+    </table></div>
+    <p class="ask">Write the three numbers down. We compare them in the room.</p>
+    <div class="row">${ROUNDS.map((r, i) => `<button class="ghost" data-i="${i}">Round ${i + 1} again</button>`).join('')}</div>`;
+  screen.querySelectorAll('[data-i]').forEach(b => b.onclick = () => intro(+b.dataset.i));
+}
+
+if (location.search === '?test') screen.textContent = 'selfCheck ' + JSON.stringify(selfCheck());
+else home();
+</script>
+</body>
+</html>
